@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Detail - Photo Album</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Additional styles for detail page */
+        .detail-container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .detail-image-container {
+            width: 100%;
+            max-height: 600px;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #f0f0f0;
+        }
+        
+        .detail-image {
+            max-width: 100%;
+            max-height: 600px;
+            object-fit: contain;
+        }
+        
+        .detail-metadata {
+            padding: 20px;
+        }
+        
+        .detail-metadata p {
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+        
+        .back-btn {
+            display: inline-block;
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            text-decoration: none;
+            margin-bottom: 20px;
+        }
+        
+        .back-btn:hover {
+            background-color: #2980b9;
+        }
+        
+        .loading-message {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2rem;
+            color: #7f8c8d;
+        }
+        
+        .error-message {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2rem;
+            color: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Photo Detail</h1>
+    </header>
+    
+    <main>
+        <a href="index.html" class="back-btn">← Back to Album</a>
+        
+        <div id="detail-content">
+            <div class="loading-message">Loading photo...</div>
+        </div>
+    </main>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Get photo ID from URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const photoId = urlParams.get('id');
+            
+            if (!photoId) {
+                showError('No photo ID provided');
+                return;
+            }
+            
+            // IndexedDB setup
+            const DB_NAME = 'photoAlbumDB';
+            const STORE_NAME = 'photos';
+            const DB_VERSION = 1;
+            
+            // Open database
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            
+            request.onerror = (event) => {
+                console.error('IndexedDB error:', event.target.error);
+                showError('Error opening database');
+            };
+            
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                
+                // Create object store for photos if it doesn't exist
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                }
+            };
+            
+            request.onsuccess = (event) => {
+                const db = event.target.result;
+                console.log('Database opened successfully');
+                
+                // Load photo from database
+                loadPhotoFromDB(db, photoId);
+            };
+            
+            /**
+             * Load photo from IndexedDB by ID
+             */
+            function loadPhotoFromDB(db, id) {
+                const transaction = db.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.get(id);
+                
+                request.onsuccess = (event) => {
+                    const photo = event.target.result;
+                    
+                    if (photo) {
+                        displayPhoto(photo);
+                    } else {
+                        showError('Photo not found');
+                    }
+                };
+                
+                request.onerror = (event) => {
+                    console.error('Error loading photo from database:', event.target.error);
+                    showError('Error loading photo');
+                };
+            }
+            
+            /**
+             * Display photo and metadata
+             */
+            function displayPhoto(photo) {
+                const detailContent = document.getElementById('detail-content');
+                
+                // Create detail view HTML
+                const html = `
+                    <div class="detail-container">
+                        <div class="detail-image-container">
+                            <img src="${photo.imgSrc}" alt="${photo.name}" class="detail-image">
+                        </div>
+                        <div class="detail-metadata">
+                            <p><strong>Name:</strong> ${photo.name}</p>
+                            <p><strong>Size:</strong> ${photo.size}</p>
+                            <p><strong>Type:</strong> ${photo.type}</p>
+                            <p><strong>Date Added:</strong> ${photo.date}</p>
+                        </div>
+                    </div>
+                `;
+                
+                detailContent.innerHTML = html;
+                
+                // Update page title
+                document.title = `${photo.name} - Photo Album`;
+            }
+            
+            /**
+             * Show error message
+             */
+            function showError(message) {
+                const detailContent = document.getElementById('detail-content');
+                detailContent.innerHTML = `<div class="error-message">${message}</div>`;
+            }
+        });
+    </script>
+</body>
+</html>

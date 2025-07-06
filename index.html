@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Album</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Photo Album</h1>
+    </header>
+    
+    <main>
+        <section class="photo-controls">
+            <div class="add-photo">
+                <label for="photo-upload" class="upload-btn">Add New Photo</label>
+                <input type="file" id="photo-upload" accept="image/*" multiple>
+            </div>
+        </section>
+        
+        <section class="photo-grid" id="photo-grid">
+            <!-- Photos will be dynamically added here -->
+        </section>
+    </main>
+    
+    <template id="photo-template">
+        <div class="photo-card">
+            <div class="photo-container">
+                <img src="" alt="Photo" class="photo-img">
+                <button class="remove-btn">×</button>
+            </div>
+            <div class="photo-metadata">
+                <p class="photo-name"><strong>Name:</strong> <span class="name-value"></span></p>
+                <p class="photo-size"><strong>Size:</strong> <span class="size-value"></span></p>
+                <p class="photo-type"><strong>Type:</strong> <span class="type-value"></span></p>
+                <p class="photo-date"><strong>Date Added:</strong> <span class="date-value"></span></p>
+            </div>
+        </div>
+    </template>
+    
+    <script src="script.js"></script>
+</body>
+</html>
