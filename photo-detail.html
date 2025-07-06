@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Photo Detail - Photo Album</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='50' y='150' width='412' height='262' rx='20' ry='20' fill='%232c3e50'/%3E%3Crect x='150' y='120' width='212' height='30' rx='10' ry='10' fill='%2334495e'/%3E%3Ccircle cx='256' cy='281' r='100' fill='%237f8c8d'/%3E%3Ccircle cx='256' cy='281' r='80' fill='%2395a5a6'/%3E%3Ccircle cx='256' cy='281' r='60' fill='%2334495e'/%3E%3Ccircle cx='256' cy='281' r='40' fill='%232c3e50'/%3E%3Crect x='380' y='180' width='40' height='20' rx='5' ry='5' fill='%23ecf0f1'/%3E%3Crect x='100' y='180' width='60' height='40' rx='5' ry='5' fill='%2334495e'/%3E%3Ccircle cx='420' cy='200' r='15' fill='%23e74c3c'/%3E%3C/svg%3E" type="image/svg+xml">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='80' y='130' width='352' height='280' rx='20' ry='20' fill='%232c3e50'/%3E%3Crect x='170' y='100' width='172' height='30' rx='10' ry='10' fill='%2334495e'/%3E%3Ccircle cx='256' cy='256' r='80' fill='white'/%3E%3Ccircle cx='400' cy='180' r='15' fill='%23e74c3c'/%3E%3C/svg%3E" type="image/svg+xml">
     <link rel="stylesheet" href="styles.css">
     <style>
         /* Additional styles for detail page */
@@ -127,64 +127,189 @@
             }
             
             // IndexedDB setup
-            const DB_NAME = 'photoAlbumDB';
-            const STORE_NAME = 'photos';
-            const DB_VERSION = 1;
+            let db;
+            const DB_NAME = 'photoAlbumDB_v2'; // Match the database name in the main page
+            const PHOTOS_STORE = 'photos';
+            const METADATA_STORE = 'metadataFields';
+            const DB_VERSION = 1; // Match the database version in the main page
             
-            // Open database
-            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            // Fallback storage for critical data
+            const LOCAL_STORAGE_PHOTO_IDS_KEY = 'photoAlbum_photoIds';
             
-            request.onerror = (event) => {
-                console.error('IndexedDB error:', event.target.error);
-                showError('Error opening database');
-            };
-            
-            request.onupgradeneeded = (event) => {
-                const db = event.target.result;
+            // Initialize database
+            function initDatabase() {
+                console.log('Initializing database...');
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
                 
-                // Create object store for photos if it doesn't exist
-                if (!db.objectStoreNames.contains(STORE_NAME)) {
-                    db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                request.onerror = (event) => {
+                    console.error('IndexedDB error:', event.target.error);
+                    
+                    // Try to recover by checking the old database
+                    tryOldDatabase(photoId);
+                };
+                
+                request.onblocked = (event) => {
+                    console.warn('Database opening blocked, please close other tabs with this app');
+                    showError('Database opening blocked. Please close any other tabs with this application and refresh the page.');
+                };
+                
+                request.onupgradeneeded = (event) => {
+                    console.log('Database upgrade needed, creating object stores...');
+                    const db = event.target.result;
+                    
+                    // Create object store for photos if it doesn't exist
+                    if (!db.objectStoreNames.contains(PHOTOS_STORE)) {
+                        console.log('Creating photos store');
+                        db.createObjectStore(PHOTOS_STORE, { keyPath: 'id' });
+                    }
+                    
+                    // Create object store for metadata fields if it doesn't exist
+                    if (!db.objectStoreNames.contains(METADATA_STORE)) {
+                        console.log('Creating metadata fields store');
+                        db.createObjectStore(METADATA_STORE, { keyPath: 'id' });
+                    }
+                };
+                
+                request.onsuccess = (event) => {
+                    db = event.target.result;
+                    console.log('Database opened successfully');
+                    
+                    // Handle database version changes
+                    db.onversionchange = (event) => {
+                        db.close();
+                        alert('Database is outdated, please reload the page.');
+                    };
+                    
+                    // Load photo from database
+                    loadPhotoFromDB(db, photoId);
+                };
+            }
+            
+            // Start database initialization
+            initDatabase();
+            
+            /**
+             * Try to load photo from the old database if the new one fails
+             */
+            function tryOldDatabase(photoId) {
+                console.log('Trying to load photo from old database...');
+                const oldRequest = indexedDB.open('photoAlbumDB', 2);
+                
+                oldRequest.onsuccess = (event) => {
+                    const oldDb = event.target.result;
+                    console.log('Old database opened successfully');
+                    
+                    // Try to get the photo from the old database
+                    const transaction = oldDb.transaction(['photos'], 'readonly');
+                    const store = transaction.objectStore('photos');
+                    const request = store.get(photoId);
+                    
+                    request.onsuccess = (event) => {
+                        const photo = event.target.result;
+                        
+                        if (photo) {
+                            console.log('Photo found in old database, displaying it');
+                            displayPhoto(photo);
+                            
+                            // Close the old database
+                            oldDb.close();
+                        } else {
+                            console.log('Photo not found in old database either');
+                            // Try to recover from localStorage
+                            tryRecoverFromLocalStorage(photoId);
+                        }
+                    };
+                    
+                    request.onerror = (event) => {
+                        console.error('Error loading photo from old database:', event.target.error);
+                        // Try to recover from localStorage
+                        tryRecoverFromLocalStorage(photoId);
+                    };
+                };
+                
+                oldRequest.onerror = (event) => {
+                    console.error('Error opening old database:', event.target.error);
+                    // Try to recover from localStorage
+                    tryRecoverFromLocalStorage(photoId);
+                };
+            }
+            
+            /**
+             * Try to recover photo ID from localStorage
+             */
+            function tryRecoverFromLocalStorage(photoId) {
+                console.log('Trying to recover photo from localStorage...');
+                try {
+                    // Check if the photo ID is in localStorage
+                    const photoIdsStr = localStorage.getItem(LOCAL_STORAGE_PHOTO_IDS_KEY);
+                    if (photoIdsStr) {
+                        const photoIds = JSON.parse(photoIdsStr);
+                        if (photoIds.includes(photoId)) {
+                            console.log('Photo ID found in localStorage, but cannot retrieve the actual photo data');
+                            showError('Photo found in backup storage but cannot be retrieved. Please go back to the main page.');
+                        } else {
+                            showError('Photo not found');
+                        }
+                    } else {
+                        showError('Photo not found');
+                    }
+                } catch (error) {
+                    console.error('Error recovering from localStorage:', error);
+                    showError('Photo not found');
                 }
-            };
-            
-            request.onsuccess = (event) => {
-                const db = event.target.result;
-                console.log('Database opened successfully');
-                
-                // Load photo from database
-                loadPhotoFromDB(db, photoId);
-            };
+            }
             
             /**
              * Load photo from IndexedDB by ID
              */
             function loadPhotoFromDB(db, id) {
-                const transaction = db.transaction([STORE_NAME], 'readonly');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.get(id);
-                
-                request.onsuccess = (event) => {
-                    const photo = event.target.result;
+                console.log('Loading photo from database:', id);
+                try {
+                    const transaction = db.transaction([PHOTOS_STORE], 'readonly');
+                    const store = transaction.objectStore(PHOTOS_STORE);
+                    const request = store.get(id);
                     
-                    if (photo) {
-                        displayPhoto(photo);
-                    } else {
-                        showError('Photo not found');
-                    }
-                };
-                
-                request.onerror = (event) => {
-                    console.error('Error loading photo from database:', event.target.error);
-                    showError('Error loading photo');
-                };
+                    request.onsuccess = (event) => {
+                        const photo = event.target.result;
+                        
+                        if (photo) {
+                            console.log('Photo found in database, displaying it');
+                            displayPhoto(photo);
+                        } else {
+                            console.log('Photo not found in database');
+                            // Try to recover from old database
+                            tryOldDatabase(id);
+                        }
+                    };
+                    
+                    request.onerror = (event) => {
+                        console.error('Error loading photo from database:', event.target.error);
+                        // Try to recover from old database
+                        tryOldDatabase(id);
+                    };
+                    
+                    transaction.oncomplete = () => {
+                        console.log('Photo loading transaction completed');
+                    };
+                    
+                    transaction.onerror = (event) => {
+                        console.error('Photo loading transaction error:', event.target.error);
+                    };
+                } catch (error) {
+                    console.error('Error in loadPhotoFromDB:', error);
+                    // Try to recover from old database
+                    tryOldDatabase(id);
+                }
             }
             
             /**
              * Display photo and metadata
              */
-            function displayPhoto(photo) {
+            async function displayPhoto(photo) {
                 const detailContent = document.getElementById('detail-content');
+                
+                // Generate custom metadata HTML
+                const customMetadataHTML = await generateCustomMetadataHTML(photo);
                 
                 // Create detail view HTML
                 const html = `
@@ -201,6 +326,9 @@
                             <p><strong>Size:</strong> ${photo.size}</p>
                             <p><strong>Type:</strong> ${photo.type}</p>
                             <p><strong>Date Added:</strong> ${photo.date}</p>
+                            <div class="custom-metadata">
+                                ${customMetadataHTML}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -212,6 +340,159 @@
                 
                 // Setup zoom functionality
                 setupZoomControls();
+            }
+            
+            /**
+             * Generate HTML for custom metadata
+             */
+            async function generateCustomMetadataHTML(photo) {
+                if (!photo.customMetadata || Object.keys(photo.customMetadata).length === 0) {
+                    return '<p class="no-custom-metadata">No custom metadata available</p>';
+                }
+                
+                // Get all metadata fields
+                const fields = await getMetadataFields();
+                
+                if (!fields || fields.length === 0) {
+                    return '<p class="no-custom-metadata">No custom metadata available</p>';
+                }
+                
+                let html = '<h3>Custom Metadata</h3>';
+                
+                fields.forEach(field => {
+                    const fieldId = field.id;
+                    const fieldLabel = field.label;
+                    const fieldValue = photo.customMetadata[fieldId] || '';
+                    
+                    html += `
+                        <div class="metadata-field" data-field-id="${fieldId}">
+                            <p>
+                                <strong>${fieldLabel}:</strong> 
+                                <span class="metadata-value">${fieldValue}</span>
+                                <button class="edit-btn" onclick="editMetadataField('${fieldId}')">Edit</button>
+                            </p>
+                        </div>
+                    `;
+                });
+                
+                return html;
+            }
+            
+            /**
+             * Get all metadata fields from IndexedDB
+             */
+            function getMetadataFields() {
+                return new Promise((resolve, reject) => {
+                    if (!db) {
+                        resolve([]);
+                        return;
+                    }
+                    
+                    const transaction = db.transaction([METADATA_STORE], 'readonly');
+                    const store = transaction.objectStore(METADATA_STORE);
+                    const request = store.getAll();
+                    
+                    request.onsuccess = (event) => {
+                        resolve(event.target.result || []);
+                    };
+                    
+                    request.onerror = (event) => {
+                        console.error('Error getting metadata fields:', event.target.error);
+                        resolve([]);
+                    };
+                });
+            }
+            
+            /**
+             * Edit metadata field
+             */
+            function editMetadataField(fieldId) {
+                const fieldElement = document.querySelector(`.metadata-field[data-field-id="${fieldId}"]`);
+                
+                if (!fieldElement) return;
+                
+                const valueElement = fieldElement.querySelector('.metadata-value');
+                const currentValue = valueElement.textContent;
+                const editButton = fieldElement.querySelector('.edit-btn');
+                
+                // Create input element
+                const inputElement = document.createElement('input');
+                inputElement.type = 'text';
+                inputElement.value = currentValue;
+                inputElement.className = 'metadata-input';
+                
+                // Create save button
+                const saveButton = document.createElement('button');
+                saveButton.className = 'save-btn';
+                saveButton.textContent = 'Save';
+                saveButton.onclick = () => saveMetadataField(fieldId, inputElement.value);
+                
+                // Replace elements
+                valueElement.replaceWith(inputElement);
+                editButton.replaceWith(saveButton);
+                
+                // Focus the input
+                inputElement.focus();
+            }
+            
+            /**
+             * Save metadata field
+             */
+            function saveMetadataField(fieldId, value) {
+                const urlParams = new URLSearchParams(window.location.search);
+                const photoId = urlParams.get('id');
+                
+                if (!photoId || !db) return;
+                
+                const transaction = db.transaction([PHOTOS_STORE], 'readwrite');
+                const store = transaction.objectStore(PHOTOS_STORE);
+                const request = store.get(photoId);
+                
+                request.onsuccess = (event) => {
+                    const photo = event.target.result;
+                    
+                    if (photo) {
+                        // Initialize customMetadata if it doesn't exist
+                        if (!photo.customMetadata) {
+                            photo.customMetadata = {};
+                        }
+                        
+                        // Update the value
+                        photo.customMetadata[fieldId] = value;
+                        
+                        // Save the updated photo
+                        const updateTransaction = db.transaction([PHOTOS_STORE], 'readwrite');
+                        const updateStore = updateTransaction.objectStore(PHOTOS_STORE);
+                        updateStore.put(photo);
+                        
+                        // Update the UI
+                        const fieldElement = document.querySelector(`.metadata-field[data-field-id="${fieldId}"]`);
+                        
+                        if (fieldElement) {
+                            const inputElement = fieldElement.querySelector('.metadata-input');
+                            const saveButton = fieldElement.querySelector('.save-btn');
+                            
+                            // Create value element
+                            const valueElement = document.createElement('span');
+                            valueElement.className = 'metadata-value';
+                            valueElement.textContent = value;
+                            
+                            // Create edit button
+                            const editButton = document.createElement('button');
+                            editButton.className = 'edit-btn';
+                            editButton.textContent = 'Edit';
+                            editButton.onclick = () => editMetadataField(fieldId);
+                            
+                            // Replace elements
+                            inputElement.replaceWith(valueElement);
+                            saveButton.replaceWith(editButton);
+                        }
+                    }
+                };
+                
+                request.onerror = (event) => {
+                    console.error('Error getting photo for metadata update:', event.target.error);
+                };
             }
             
             /**
@@ -319,7 +600,7 @@
             /**
              * Show error message or test image
              */
-            function showError(message) {
+            async function showError(message) {
                 const detailContent = document.getElementById('detail-content');
                 
                 // If photo not found, show a test image to demonstrate zoom controls
@@ -330,11 +611,12 @@
                         size: '123 KB',
                         type: 'image/jpeg',
                         date: new Date().toLocaleString(),
-                        imgSrc: 'https://picsum.photos/800/600' // Random sample image from Lorem Picsum
+                        imgSrc: 'https://picsum.photos/800/600', // Random sample image from Lorem Picsum
+                        customMetadata: {}
                     };
                     
                     // Display the test photo
-                    displayPhoto(testPhoto);
+                    await displayPhoto(testPhoto);
                     
                     // Add a note that this is a test image
                     const noteElement = document.createElement('div');

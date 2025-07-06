@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Photo Album</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='50' y='150' width='412' height='262' rx='20' ry='20' fill='%232c3e50'/%3E%3Crect x='150' y='120' width='212' height='30' rx='10' ry='10' fill='%2334495e'/%3E%3Ccircle cx='256' cy='281' r='100' fill='%237f8c8d'/%3E%3Ccircle cx='256' cy='281' r='80' fill='%2395a5a6'/%3E%3Ccircle cx='256' cy='281' r='60' fill='%2334495e'/%3E%3Ccircle cx='256' cy='281' r='40' fill='%232c3e50'/%3E%3Crect x='380' y='180' width='40' height='20' rx='5' ry='5' fill='%23ecf0f1'/%3E%3Crect x='100' y='180' width='60' height='40' rx='5' ry='5' fill='%2334495e'/%3E%3Ccircle cx='420' cy='200' r='15' fill='%23e74c3c'/%3E%3C/svg%3E" type="image/svg+xml">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='80' y='130' width='352' height='280' rx='20' ry='20' fill='%232c3e50'/%3E%3Crect x='170' y='100' width='172' height='30' rx='10' ry='10' fill='%2334495e'/%3E%3Ccircle cx='256' cy='256' r='80' fill='white'/%3E%3Ccircle cx='400' cy='180' r='15' fill='%23e74c3c'/%3E%3C/svg%3E" type="image/svg+xml">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -18,7 +18,30 @@
                 <label for="photo-upload" class="upload-btn">Add New Photo</label>
                 <input type="file" id="photo-upload" accept="image/*" multiple>
             </div>
+            <div class="metadata-controls">
+                <button id="manage-metadata-btn" class="manage-btn">Manage Metadata Fields</button>
+            </div>
         </section>
+        
+        <!-- Metadata Management Modal -->
+        <div id="metadata-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <h2>Manage Metadata Fields</h2>
+                <p class="modal-description">Add custom metadata fields that will appear on all photos.</p>
+                
+                <div class="metadata-fields-container">
+                    <div id="metadata-fields-list">
+                        <!-- Existing metadata fields will be listed here -->
+                    </div>
+                    
+                    <div class="add-metadata-field">
+                        <input type="text" id="new-metadata-label" placeholder="Enter new field label">
+                        <button id="add-metadata-field-btn">Add Field</button>
+                    </div>
+                </div>
+            </div>
+        </div>
         
         <section class="photo-grid" id="photo-grid">
             <!-- Photos will be dynamically added here -->
@@ -36,7 +59,17 @@
                 <p class="photo-size"><strong>Size:</strong> <span class="size-value"></span></p>
                 <p class="photo-type"><strong>Type:</strong> <span class="type-value"></span></p>
                 <p class="photo-date"><strong>Date Added:</strong> <span class="date-value"></span></p>
+                <div class="custom-metadata">
+                    <!-- Custom metadata fields will be added here -->
+                </div>
             </div>
+        </div>
+    </template>
+    
+    <template id="metadata-field-template">
+        <div class="metadata-field-item">
+            <span class="metadata-label"></span>
+            <button class="remove-metadata-field-btn">Remove</button>
         </div>
     </template>
     
