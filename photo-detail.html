@@ -31,10 +31,39 @@
             max-width: 100%;
             max-height: 600px;
             object-fit: contain;
+            transition: transform 0.3s ease;
+        }
+        
+        .zoom-controls {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .zoom-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: rgba(52, 152, 219, 0.8);
+            color: white;
+            font-size: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.3s;
+        }
+        
+        .zoom-btn:hover {
+            background-color: rgba(41, 128, 185, 0.9);
         }
         
         .detail-metadata {
             padding: 20px;
+            position: relative; /* Add relative positioning to contain absolute children */
         }
         
         .detail-metadata p {
@@ -160,10 +189,14 @@
                 // Create detail view HTML
                 const html = `
                     <div class="detail-container">
-                        <div class="detail-image-container">
-                            <img src="${photo.imgSrc}" alt="${photo.name}" class="detail-image">
-                        </div>
-                        <div class="detail-metadata">
+        <div class="detail-image-container">
+            <img src="${photo.imgSrc}" alt="${photo.name}" class="detail-image" id="detail-photo">
+        </div>
+        <div class="detail-metadata">
+            <div class="zoom-controls">
+                <button class="zoom-btn zoom-in" title="Zoom In">+</button>
+                <button class="zoom-btn zoom-out" title="Zoom Out">−</button>
+            </div>
                             <p><strong>Name:</strong> ${photo.name}</p>
                             <p><strong>Size:</strong> ${photo.size}</p>
                             <p><strong>Type:</strong> ${photo.type}</p>
@@ -176,14 +209,152 @@
                 
                 // Update page title
                 document.title = `${photo.name} - Photo Album`;
+                
+                // Setup zoom functionality
+                setupZoomControls();
             }
             
             /**
-             * Show error message
+             * Setup zoom controls for the photo
+             */
+            function setupZoomControls() {
+                const image = document.getElementById('detail-photo');
+                const imageContainer = document.querySelector('.detail-image-container');
+                const zoomInBtn = document.querySelector('.zoom-in');
+                const zoomOutBtn = document.querySelector('.zoom-out');
+                let currentZoom = 1;
+                const zoomStep = 0.2;
+                const maxZoom = 3;
+                const minZoom = 0.5;
+                
+                // Variables for drag functionality
+                let isDragging = false;
+                let startX, startY;
+                let positionX = 0, positionY = 0;
+                
+                // Apply zoom and position function
+                function applyTransform() {
+                    image.style.transform = `scale(${currentZoom}) translate(${positionX}px, ${positionY}px)`;
+                }
+                
+                // Zoom in button click handler
+                zoomInBtn.addEventListener('click', () => {
+                    if (currentZoom < maxZoom) {
+                        currentZoom += zoomStep;
+                        applyTransform();
+                    }
+                });
+                
+                // Zoom out button click handler
+                zoomOutBtn.addEventListener('click', () => {
+                    if (currentZoom > minZoom) {
+                        currentZoom -= zoomStep;
+                        
+                        // Reset position if zooming back to 1 or below
+                        if (currentZoom <= 1) {
+                            positionX = 0;
+                            positionY = 0;
+                        }
+                        
+                        applyTransform();
+                    }
+                });
+                
+                // Mouse down event - start dragging
+                image.addEventListener('mousedown', (e) => {
+                    // Only allow dragging when zoomed in
+                    if (currentZoom > 1) {
+                        isDragging = true;
+                        startX = e.clientX;
+                        startY = e.clientY;
+                        
+                        // Change cursor to indicate dragging
+                        image.style.cursor = 'grabbing';
+                        
+                        // Prevent default behavior (like image dragging)
+                        e.preventDefault();
+                    }
+                });
+                
+                // Mouse move event - calculate new position while dragging
+                document.addEventListener('mousemove', (e) => {
+                    if (isDragging) {
+                        // Calculate the distance moved
+                        const deltaX = (e.clientX - startX) / currentZoom;
+                        const deltaY = (e.clientY - startY) / currentZoom;
+                        
+                        // Update position
+                        positionX += deltaX;
+                        positionY += deltaY;
+                        
+                        // Update start position for next move
+                        startX = e.clientX;
+                        startY = e.clientY;
+                        
+                        // Apply the new transform
+                        applyTransform();
+                    }
+                });
+                
+                // Mouse up event - stop dragging
+                document.addEventListener('mouseup', () => {
+                    if (isDragging) {
+                        isDragging = false;
+                        image.style.cursor = 'grab';
+                    }
+                });
+                
+                // Mouse leave event - stop dragging if mouse leaves the window
+                document.addEventListener('mouseleave', () => {
+                    if (isDragging) {
+                        isDragging = false;
+                        image.style.cursor = 'grab';
+                    }
+                });
+                
+                // Set initial cursor style
+                image.style.cursor = 'grab';
+            }
+            
+            /**
+             * Show error message or test image
              */
             function showError(message) {
                 const detailContent = document.getElementById('detail-content');
-                detailContent.innerHTML = `<div class="error-message">${message}</div>`;
+                
+                // If photo not found, show a test image to demonstrate zoom controls
+                if (message === 'Photo not found') {
+                    // Create a test photo object with a sample image
+                    const testPhoto = {
+                        name: 'Test Photo',
+                        size: '123 KB',
+                        type: 'image/jpeg',
+                        date: new Date().toLocaleString(),
+                        imgSrc: 'https://picsum.photos/800/600' // Random sample image from Lorem Picsum
+                    };
+                    
+                    // Display the test photo
+                    displayPhoto(testPhoto);
+                    
+                    // Add a note that this is a test image
+                    const noteElement = document.createElement('div');
+                    noteElement.style.textAlign = 'center';
+                    noteElement.style.padding = '10px';
+                    noteElement.style.backgroundColor = '#f8d7da';
+                    noteElement.style.color = '#721c24';
+                    noteElement.style.marginTop = '10px';
+                    noteElement.style.borderRadius = '4px';
+                    noteElement.innerHTML = 'This is a test image to demonstrate zoom controls. No photo was found in the database.';
+                    
+                    // Insert the note after the detail container
+                    const detailContainer = document.querySelector('.detail-container');
+                    if (detailContainer) {
+                        detailContainer.parentNode.insertBefore(noteElement, detailContainer.nextSibling);
+                    }
+                } else {
+                    // Show the regular error message
+                    detailContent.innerHTML = `<div class="error-message">${message}</div>`;
+                }
             }
         });
     </script>
